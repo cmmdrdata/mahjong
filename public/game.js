@@ -55,7 +55,10 @@ const TILE_W      = 68;
 const TILE_H      = 84;
 const BOX_MAX     = 4;
 const CLEAR_DELAY = 1500;
-const LS_KEY      = 'mahjong_best_times'; // localStorage key
+const LS_KEY         = 'mahjong_best_times';   // localStorage key
+const LS_TPM_KEY     = 'mahjong_best_tpm';     // best tiles-per-minute per player
+const LS_ACTIVE_KEY  = 'mahjong_active_players'; // who is playing right now
+const ACTIVE_TTL_MS  = 30 * 60 * 1000;          // 30 minutes before a session expires
 
 // ── Session state ─────────────────────────────────────────────────────────────
 
@@ -72,6 +75,11 @@ let score         = 0;
 // Shuffle
 const SHUFFLE_MAX   = 3;
 let shufflesLeft    = SHUFFLE_MAX;
+
+// Hint
+const HINT_MAX   = 3;
+let hintsLeft    = HINT_MAX;
+let hintTimeout  = null; // timer to clear the hint highlight
 
 // Timer
 let timerInterval = null;
@@ -98,6 +106,11 @@ const layoutSelect      = document.getElementById('layout-select');
 const bestScoresPreview = document.getElementById('best-scores-preview');
 const shuffleBtn        = document.getElementById('shuffle-btn');
 const shuffleCountEl    = document.getElementById('shuffle-count');
+const hintBtn           = document.getElementById('hint-btn');
+const hintCountEl       = document.getElementById('hint-count');
+const activePlayersEl   = document.getElementById('active-players');
+const tilesPerMinEl     = document.getElementById('tiles-per-min');
+const tpmValueEl        = document.getElementById('tpm-value');
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
 
@@ -135,6 +148,91 @@ function updateBestTimeDisplay() {
     : '';
 }
 
+// ── Active-player tracking ────────────────────────────────────────────────────
+
+function loadActivePlayers() {
+  try { return JSON.parse(localStorage.getItem(LS_ACTIVE_KEY)) || {}; }
+  catch { return {}; }
+}
+
+// Register the current player as active, purging stale entries.
+function registerActivePlayer() {
+  const data = loadActivePlayers();
+  const now  = Date.now();
+  // Purge entries older than TTL
+  Object.keys(data).forEach(k => { if (now - data[k] > ACTIVE_TTL_MS) delete data[k]; });
+  data[playerName] = now;
+  localStorage.setItem(LS_ACTIVE_KEY, JSON.stringify(data));
+  renderActivePlayers();
+}
+
+// Remove current player from the active set (game over / win).
+function unregisterActivePlayer() {
+  const data = loadActivePlayers();
+  delete data[playerName];
+  localStorage.setItem(LS_ACTIVE_KEY, JSON.stringify(data));
+  renderActivePlayers();
+}
+
+// Render the banner showing who is currently playing.
+function renderActivePlayers() {
+  const data = loadActivePlayers();
+  const now  = Date.now();
+  const names = Object.entries(data)
+    .filter(([, ts]) => now - ts <= ACTIVE_TTL_MS)
+    .map(([n]) => n);
+
+  if (names.length === 0) {
+    activePlayersEl.classList.add('hidden');
+    return;
+  }
+  const formatted = names.map(n =>
+    n === playerName ? `<strong>${n}</strong>` : n
+  ).join(' · ');
+  activePlayersEl.innerHTML = `🎮 Now playing: ${formatted}`;
+  activePlayersEl.classList.remove('hidden');
+}
+
+// Refresh the banner once per minute (TTL cleanup, same-tab fallback).
+setInterval(renderActivePlayers, 60_000);
+
+// React instantly when another tab writes to localStorage (new player joins,
+// player leaves, or their session expires). The storage event only fires in
+// tabs *other than* the one that made the change, which is exactly what we want.
+window.addEventListener('storage', e => {
+  if (e.key === LS_ACTIVE_KEY) renderActivePlayers();
+});
+
+// ── Tiles-per-minute ──────────────────────────────────────────────────────────
+
+function updateTilesPerMin() {
+  if (timerSeconds < 5) return; // avoid wild numbers in the first few seconds
+  const tpm = (matchCount * 2) / (timerSeconds / 60);
+  tpmValueEl.textContent = tpm.toFixed(1);
+  tilesPerMinEl.classList.remove('hidden');
+}
+
+// Best tiles/min per player × tile-count combination.
+function loadBestTpm() {
+  try { return JSON.parse(localStorage.getItem(LS_TPM_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveBestTpm(name, tileCount, tpm) {
+  const data = loadBestTpm();
+  const key  = `${name}__${tileCount}`;
+  if (!data[key] || tpm > data[key]) {
+    data[key] = parseFloat(tpm.toFixed(2));
+    localStorage.setItem(LS_TPM_KEY, JSON.stringify(data));
+    return true;
+  }
+  return false;
+}
+
+function getBestTpm(name, tileCount) {
+  return loadBestTpm()[`${name}__${tileCount}`] ?? null;
+}
+
 // ── Start screen ──────────────────────────────────────────────────────────────
 
 function renderScoresPreview() {
@@ -170,6 +268,8 @@ startBtn.addEventListener('click', () => {
 
 // Show start screen immediately; populate scores
 renderScoresPreview();
+// Show any already-active players on load (other tabs / other players on same device)
+renderActivePlayers();
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
 
@@ -179,6 +279,7 @@ function startTimer() {
   timerInterval = setInterval(() => {
     timerSeconds++;
     timerEl.textContent = formatTime(timerSeconds);
+    updateTilesPerMin();
   }, 1000);
 }
 
@@ -202,6 +303,8 @@ function init() {
   matchCount    = 0;
   score         = 0;
   shufflesLeft  = SHUFFLE_MAX;
+  hintsLeft     = HINT_MAX;
+  if (hintTimeout) { clearTimeout(hintTimeout); hintTimeout = null; }
 
   resetTimer();
 
@@ -211,8 +314,15 @@ function init() {
   overlayEl.classList.add('hidden');
   boardEl.innerHTML   = '';
   tileBoxEl.innerHTML = '';
+  // Hide tiles/min until enough time has passed
+  tilesPerMinEl.classList.add('hidden');
+  tpmValueEl.textContent = '0.0';
+  // Reset any layout-driven width override from a previous pyramid game
+  document.getElementById('app').style.maxWidth = '';
 
+  registerActivePlayer();
   updateShuffleBtn();
+  updateHintBtn();
   updateBestTimeDisplay();
   buildBoard();
 }
@@ -432,7 +542,7 @@ function buildPyramidGridSlots(total) {
         x: c * TILE_W + offsetX,
         y: r * TILE_H + offsetY,
         layer,
-        mound: layer % MOUND_COLORS.length, // reuse mound colours per layer
+        mound: (r * gridCols + c) % MOUND_COLORS.length, // vary colour by cell position
         idx: slotIdx,
       };
 
@@ -531,8 +641,17 @@ function buildBoard() {
     maxX -= minX; maxY -= minY;
   }
   // Add shadow/depth clearance
-  boardEl.style.width  = (maxX + 14) + 'px';
-  boardEl.style.height = (maxY + 14) + 'px';
+  const boardW = maxX + 14;
+  const boardH = maxY + 14;
+  boardEl.style.width  = boardW + 'px';
+  boardEl.style.height = boardH + 'px';
+
+  // If the board is wider than the default #app max-width, expand #app so the
+  // dark-green #board-area background box fully wraps the pyramid layout.
+  // 32px = left+right padding of #board-area (16px each side).
+  const appEl = document.getElementById('app');
+  const neededAppW = boardW + 32; // board width + board-area padding
+  appEl.style.maxWidth = neededAppW > 620 ? neededAppW + 'px' : '';
 
   // Render
   boardTiles.forEach(tile => {
@@ -700,10 +819,10 @@ function onSingleClick(tile) {
   if (tile.location !== 'board') return;
 
   // If a matching tile is already waiting in the top box, this tile can go
-  // straight there — no double-click needed (unless the box is 75 % full).
+  // straight there — no double-click needed. Skip the overflow guard: this
+  // tile will pair with its box match and clear both, so the box won't grow.
   const boxMatch = boxTiles.find(t => t.id === tile.id);
   if (boxMatch) {
-    if (boxWouldOverflow(1)) return; // box too full — do nothing
     if (selectedTile === tile) selectedTile = null;
     tile.el.classList.remove('selected');
     tile.el.classList.add('flipped');
@@ -741,15 +860,7 @@ function onSingleClick(tile) {
   first.el.classList.remove('selected');
 
   if (first.id === second.id) {
-    if (boxWouldOverflow(2)) {
-      // Box too full to accept a new pair — keep first selected, deselect second.
-      second.el.classList.remove('selected');
-      if (!second.el.classList.contains('flipped') && !second.startedFaceUp)
-        second.el.classList.remove('flipped');
-      first.el.classList.add('selected');
-      selectedTile = first;
-      return;
-    }
+    // A confirmed board pair always clears as soon as both land — never blocks the box.
     selectedTile = null;
     // Mark just this pair as no longer clickable while they animate away —
     // the rest of the board stays fully interactive in the meantime.
@@ -839,7 +950,7 @@ function flyTileToBox(tile) {
   }, { once: true });
 
   tile.location = 'box';
-  tile.el.classList.remove('flipped', 'selected', 'permanent-face-up');
+  tile.el.classList.remove('flipped', 'selected', 'permanent-face-up', 'hint-glow');
   tile.el.classList.add('matched');
   refreshBuriedState();
 }
@@ -882,6 +993,7 @@ function checkBoxForMatches() {
   }
   if (boxTiles.length >= BOX_MAX && !hasPending) {
     stopTimer();
+    unregisterActivePlayer();
     showOverlay('😔 The box is full with no matching pair!\nYou must restart.', 'Restart');
     return;
   }
@@ -908,6 +1020,7 @@ function clearBoxPair(a, b) {
   matchCountEl.textContent = matchCount;
   score += 20;
   scoreEl.textContent = score;
+  updateTilesPerMin(); // refresh rate immediately after each match
   setTimeout(() => { checkBoxForMatches(); }, 500);
 }
 
@@ -917,12 +1030,22 @@ function checkWin() {
   if (!boardTiles.every(t => t.location === 'gone') || boxTiles.length !== 0) return;
 
   stopTimer();
+  unregisterActivePlayer();
+
   const elapsed   = timerSeconds;
   const isRecord  = saveBestTime(playerName, activeTileCount, elapsed);
   const pairCount = activeTileCount / 2;
 
+  // Tiles-per-minute for this completed game
+  const finalTpm    = elapsed > 0 ? (activeTileCount / (elapsed / 60)) : 0;
+  const isTpmRecord = saveBestTpm(playerName, activeTileCount, finalTpm);
+  const bestTpm     = getBestTpm(playerName, activeTileCount);
+
   let msg = `🎉 You matched all ${pairCount} pairs!\nTime: ${formatTime(elapsed)}  ·  Score: ${score}`;
-  if (isRecord) msg += '\n🏆 New personal best!';
+  msg += `\n⚡ ${finalTpm.toFixed(1)} tiles/min`;
+  if (bestTpm !== null) msg += `  ·  Best: ${bestTpm.toFixed(1)}`;
+  if (isRecord)    msg += '\n🏆 New time record!';
+  if (isTpmRecord) msg += '\n⚡ New tiles/min record!';
 
   showOverlay(msg, 'Play Again');
   updateBestTimeDisplay();
@@ -1000,6 +1123,96 @@ function shuffleBoard() {
 shuffleBtn.addEventListener('click', () => {
   if (shufflesLeft <= 0) return;
   shuffleBoard();
+});
+
+// ── Hint ──────────────────────────────────────────────────────────────────────
+
+function updateHintBtn() {
+  hintBtn.style.display = '';   // make visible once game starts
+  hintCountEl.textContent = hintsLeft;
+  hintBtn.disabled = hintsLeft <= 0;
+}
+
+/*
+ * clearHintHighlights — remove hint-glow from all board tiles and box elements.
+ */
+function clearHintHighlights() {
+  boardTiles.forEach(t => t.el && t.el.classList.remove('hint-glow'));
+  boxTiles.forEach(t => t.boxEl && t.boxEl.classList.remove('hint-glow-box'));
+}
+
+/*
+ * doHint — highlights a playable pair for the player.
+ *
+ *  Only clickable tiles (not buried, not flanked) are considered.
+ *  If no playable move exists the hint is NOT consumed.
+ *
+ *  Priority 1 — a clickable board tile whose id matches a tile in the box.
+ *               Both the board tile and its box counterpart are highlighted.
+ *
+ *  Priority 2 — two clickable board tiles that share an id.
+ *
+ * The highlight fades after 3 seconds.
+ */
+function doHint() {
+  if (hintsLeft <= 0) return;
+
+  // Clear any existing highlight first (but don't consume a hint yet).
+  if (hintTimeout) { clearTimeout(hintTimeout); hintTimeout = null; }
+  clearHintHighlights();
+
+  const live      = boardTiles.filter(t => t.location === 'board');
+  const clickable = live.filter(t =>
+    !t.el.classList.contains('buried') && !t.el.classList.contains('flanked')
+  );
+
+  // ── Find a playable hint ───────────────────────────────────────────────────
+
+  let hintA = null, hintBoxTile = null, hintB = null;
+
+  // Priority 1: clickable board tile matching something already in the box
+  outer: for (const boxTile of boxTiles) {
+    for (const t of clickable) {
+      if (t.id === boxTile.id) { hintA = t; hintBoxTile = boxTile; break outer; }
+    }
+  }
+
+  // Priority 2: two clickable board tiles with the same id
+  if (!hintA) {
+    const seen = {};
+    for (const t of clickable) {
+      if (seen[t.id]) { hintA = seen[t.id]; hintB = t; break; }
+      seen[t.id] = t;
+    }
+  }
+
+  // No playable move — shake the button to signal it, don't consume a hint
+  if (!hintA) {
+    hintBtn.classList.remove('no-moves'); // reset so animation re-triggers
+    void hintBtn.offsetWidth;            // force reflow
+    hintBtn.classList.add('no-moves');
+    hintBtn.addEventListener('animationend', () => hintBtn.classList.remove('no-moves'), { once: true });
+    return;
+  }
+
+  // ── Consume the hint and show the highlight ────────────────────────────────
+  hintsLeft--;
+  updateHintBtn();
+  startTimer();
+
+  hintA.el.classList.add('hint-glow', 'flipped');
+  if (hintBoxTile && hintBoxTile.boxEl) hintBoxTile.boxEl.classList.add('hint-glow-box');
+  if (hintB) hintB.el.classList.add('hint-glow', 'flipped');
+
+  hintTimeout = setTimeout(() => {
+    clearHintHighlights();
+    hintTimeout = null;
+  }, 3000);
+}
+
+hintBtn.addEventListener('click', () => {
+  if (hintsLeft <= 0) return;
+  doHint();
 });
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

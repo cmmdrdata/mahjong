@@ -21,6 +21,20 @@ body {
   gap: 14px;
 }
 
+/* ── active players banner ────────────────────────────────────────── */
+#active-players {
+  background: #0e2f1c;
+  border: 1px solid #2e7d32;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  color: #a5d6a7;
+  text-align: center;
+  line-height: 1.5;
+}
+#active-players.hidden { display: none; }
+#active-players strong { color: #ffe082; }
+
 /* ── header ───────────────────────────────────────────────────────── */
 header {
   display: flex;
@@ -38,37 +52,14 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
 #stats strong { color: #fff; }
 #player-display { color: #ffe082; font-weight: bold; }
 
-/* ── shuffle button (lives in the stats bar) ─────────────────────────── */
-#shuffle-btn {
-  background: #2e7d32;
-  color: #fff;
-  border: 1.5px solid #66bb6a;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: background 0.18s, opacity 0.18s;
-  white-space: nowrap;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  line-height: 1.4;
-}
-#shuffle-btn:hover:not(:disabled) { background: #388e3c; }
-#shuffle-btn:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-  border-color: #555;
-}
-
-/* ── tile box ─────────────────────────────────────────────────────── */
-/* Box width = 4 × tile(62) + 3 × gap(10) + 2 × padding(10) = 288px */
+/* ── tile box area ─────────────────────────────────────────────────── */
 #tile-box-area {
   background: #14432a;
   border-radius: 12px;
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
 }
 #tile-box-label {
   font-size: 0.75rem;
@@ -76,8 +67,16 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
   text-transform: uppercase;
   letter-spacing: 2px;
   margin-bottom: 6px;
-  width: 288px;
 }
+
+/* Row that holds the tile box and the action buttons side-by-side */
+#tile-box-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* Box width = 4 × tile(62) + 3 × gap(10) + 2 × padding(10) = 288px */
 #tile-box {
   display: flex;
   gap: 10px;
@@ -92,17 +91,86 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
   overflow: hidden;
 }
 
+/* ── shuffle & hint buttons (beside tile box) ──────────────────────── */
+#box-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+#shuffle-btn, #hint-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 64px;
+  height: 45px;
+  background: #2e7d32;
+  color: #fff;
+  border: 1.5px solid #66bb6a;
+  border-radius: 8px;
+  font-size: 1.3rem;         /* emoji size */
+  cursor: pointer;
+  transition: background 0.18s, opacity 0.18s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+}
+#shuffle-btn:hover:not(:disabled),
+#hint-btn:hover:not(:disabled) { background: #388e3c; }
+#shuffle-btn:disabled,
+#hint-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: #555;
+}
+
+/* Shake when hint is requested but no playable move exists */
+@keyframes hintShake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-5px); }
+  40%     { transform: translateX(5px); }
+  60%     { transform: translateX(-4px); }
+  80%     { transform: translateX(4px); }
+}
+#hint-btn.no-moves {
+  animation: hintShake 0.35s ease;
+  border-color: #ef9a9a;
+  background: #7b1a1a;
+}
+#hint-btn { background: #1565a0; border-color: #42a5f5; }
+#hint-btn:hover:not(:disabled) { background: #1976d2; }
+
+.btn-label {
+  font-size: 0.62rem;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.btn-count {
+  font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1;
+  opacity: 0.85;
+}
+
 /* ── board ────────────────────────────────────────────────────────── */
 #board-area {
   background: #14432a;
   border-radius: 12px;
   padding: 16px;
-  /* height driven by #board which is sized by JS — do NOT set overflow:hidden */
+  /* expand horizontally to fit whatever width #board needs */
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 #board {
   position: relative;
   /* width & height set by JS to exactly contain all tiles + shadow clearance */
+  /* ensure the parent stretches to match */
+  min-width: 100%;
 }
 
 /* ── tile card ────────────────────────────────────────────────────── */
@@ -128,6 +196,11 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
 .tile.buried {
   pointer-events: none;
   filter: brightness(0.82);
+}
+
+.tile.flanked {
+  pointer-events: none;
+  filter: brightness(0.72);
 }
 
 /* Originally visible tiles stay face-up; cursor shows they can't be flipped */
@@ -285,6 +358,15 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
 }
 .tile.pair-glow .tile-front { animation: matchGlow 0.6s ease infinite; }
 
+/* ── hint-glow (cyan pulse, distinct from match-glow yellow) ──────── */
+@keyframes hintGlow {
+  0%,100% { box-shadow: 0 0 0 3px #00e5ff, 3px 3px 0 #8a7a60; }
+  50%      { box-shadow: 0 0 0 7px #00bcd4, 3px 3px 0 #8a7a60; }
+}
+.tile.hint-glow .tile-front { animation: hintGlow 0.7s ease infinite; }
+/* box tiles: class goes on the .tile wrapper, pulse applied to .tile-front */
+.tile.hint-glow-box .tile-front { animation: hintGlow 0.7s ease infinite; }
+
 /* ── match-clear animation ────────────────────────────────────────── */
 @keyframes matchFade {
   0%   { opacity: 1;   transform: scale(1); }
@@ -305,6 +387,9 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
   font-size: 0.9rem;
 }
 #timer { font-weight: bold; color: #fff; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+#tiles-per-min { font-size: 0.85rem; color: #80deea; font-variant-numeric: tabular-nums; }
+#tiles-per-min.hidden { display: none; }
+#tpm-value { font-weight: bold; color: #e0f7fa; }
 #best-time-display { font-size: 0.82rem; color: #81c784; }
 
 /* ── hint ─────────────────────────────────────────────────────────── */

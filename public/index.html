@@ -8,19 +8,33 @@
 </head>
 <body>
   <div id="app">
+    <div id="active-players" class="hidden"></div>
+
     <header>
       <h1>🀄 Mahjong Match</h1>
       <div id="stats">
         <span id="player-display"></span>
         <span>Matches: <strong id="match-count">0</strong></span>
         <span>Score: <strong id="score">0</strong></span>
-        <button id="shuffle-btn" title="Shuffle tiles" style="display:none">🔀 <span id="shuffle-count">3</span></button>
       </div>
     </header>
 
     <section id="tile-box-area">
       <div id="tile-box-label">Tile Box (max 4)</div>
-      <div id="tile-box"></div>
+      <div id="tile-box-row">
+        <div id="tile-box"></div>
+        <div id="box-controls">
+          <button id="shuffle-btn" title="Shuffle tiles" style="display:none">
+            🔀<span class="btn-label">Shuffle</span><span id="shuffle-count" class="btn-count">3</span>
+          </button>
+          <button id="hint-btn" title="Highlight a matching pair" style="display:none">
+            💡<span class="btn-label">Hint</span><span id="hint-count" class="btn-count">3</span>
+          </button>
+          <button id="recall-btn" title="Return a tile from the box to the board" style="display:none">
+            ↩️<span class="btn-label">Return</span><span id="recall-count" class="btn-count">2</span>
+          </button>
+        </div>
+      </div>
     </section>
 
     <p id="hint">Tap to flip / select · Double-tap to move to box</p>
@@ -31,6 +45,7 @@
 
     <footer id="game-footer">
       <div id="timer-display">⏱ <span id="timer">0:00</span></div>
+      <div id="tiles-per-min" class="hidden">⚡ <span id="tpm-value">0.0</span> tiles/min</div>
       <div id="best-time-display"></div>
     </footer>
   </div>
