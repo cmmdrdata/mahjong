@@ -1,0 +1,12 @@
+{
+  "name": "mahjong-matching",
+  "version": "1.0.0",
+  "description": "Mahjong tile matching game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

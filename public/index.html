@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mahjong Matching</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🀄 Mahjong Match</h1>
+      <div id="stats">
+        <span id="player-display"></span>
+        <span>Matches: <strong id="match-count">0</strong></span>
+        <span>Score: <strong id="score">0</strong></span>
+        <button id="shuffle-btn" title="Shuffle tiles" style="display:none">🔀 <span id="shuffle-count">3</span></button>
+      </div>
+    </header>
+
+    <section id="tile-box-area">
+      <div id="tile-box-label">Tile Box (max 4)</div>
+      <div id="tile-box"></div>
+    </section>
+
+    <p id="hint">Tap to flip / select · Double-tap to move to box</p>
+
+    <section id="board-area">
+      <div id="board"></div>
+    </section>
+
+    <footer id="game-footer">
+      <div id="timer-display">⏱ <span id="timer">0:00</span></div>
+      <div id="best-time-display"></div>
+    </footer>
+  </div>
+
+  <!-- Start screen overlay -->
+  <div id="start-screen">
+    <div id="start-box">
+      <h2>🀄 Mahjong Match</h2>
+      <label for="player-name-input">Your name</label>
+      <input id="player-name-input" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off" />
+
+      <label for="tile-count-select">Number of tiles</label>
+      <select id="tile-count-select">
+        <option value="20">20 tiles (10 pairs) — Easy</option>
+        <option value="40">40 tiles (20 pairs) — Medium</option>
+        <option value="84" selected>84 tiles (42 pairs) — Full</option>
+        <option value="100" >100 tiles (50 pairs) — Hard</option>
+        <option value="220" >220 tiles (100 pairs) — Extreme</option>
+      </select>
+
+      <label for="layout-select">Layout</label>
+      <select id="layout-select">
+        <option value="mound">Classic Mounds</option>
+        <option value="pyramid">Pyramid Grid</option>
+      </select>
+
+      <div id="best-scores-preview"></div>
+
+      <button id="start-btn">Start Game</button>
+    </div>
+  </div>
+
+  <!-- Game-over / win overlay -->
+  <div id="overlay" class="hidden">
+    <div id="overlay-box">
+      <p id="overlay-msg"></p>
+      <button id="overlay-btn">Play Again</button>
+    </div>
+  </div>
+
+  <script src="tiles.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

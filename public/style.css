@@ -1,0 +1,407 @@
+/* ── reset & base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #1a5c34;
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px 8px 60px;
+  /* Prevent rubber-band scroll interfering with tile taps on iOS */
+  overscroll-behavior: none;
+}
+
+#app {
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── header ───────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #14432a;
+  border-radius: 12px;
+  padding: 10px 18px;
+  color: #f5e6c8;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+header h1 { font-size: 1.2rem; letter-spacing: 1px; }
+#stats { display: flex; gap: 14px; font-size: 0.88rem; color: #c8e6c9; flex-wrap: wrap; align-items: center; }
+#stats strong { color: #fff; }
+#player-display { color: #ffe082; font-weight: bold; }
+
+/* ── shuffle button (lives in the stats bar) ─────────────────────────── */
+#shuffle-btn {
+  background: #2e7d32;
+  color: #fff;
+  border: 1.5px solid #66bb6a;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.18s, opacity 0.18s;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.4;
+}
+#shuffle-btn:hover:not(:disabled) { background: #388e3c; }
+#shuffle-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: #555;
+}
+
+/* ── tile box ─────────────────────────────────────────────────────── */
+/* Box width = 4 × tile(62) + 3 × gap(10) + 2 × padding(10) = 288px */
+#tile-box-area {
+  background: #14432a;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#tile-box-label {
+  font-size: 0.75rem;
+  color: #81c784;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  width: 288px;
+}
+#tile-box {
+  display: flex;
+  gap: 10px;
+  width: 288px;
+  height: 96px;
+  background: #0e2f1c;
+  border: 2px solid #1e5c32;
+  border-radius: 8px;
+  padding: 9px 10px;
+  align-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* ── board ────────────────────────────────────────────────────────── */
+#board-area {
+  background: #14432a;
+  border-radius: 12px;
+  padding: 16px;
+  /* height driven by #board which is sized by JS — do NOT set overflow:hidden */
+}
+
+#board {
+  position: relative;
+  /* width & height set by JS to exactly contain all tiles + shadow clearance */
+}
+
+/* ── tile card ────────────────────────────────────────────────────── */
+.tile {
+  position: absolute;
+  width: 68px;
+  height: 84px;
+  perspective: 700px;
+  cursor: pointer;
+  transition: filter 0.15s;
+  /* Prevent the browser from treating a tap as a pan or zoom gesture.
+     "manipulation" allows tap and double-tap but disables pinch-zoom on
+     the tile so our double-tap handler fires without a 300 ms delay. */
+  touch-action: manipulation;
+  /* Remove the grey tap flash on Android / iOS WebKit */
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent text / SVG selection during rapid taps */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tile:not(.buried):hover { filter: brightness(1.15); }
+
+.tile.buried {
+  pointer-events: none;
+  filter: brightness(0.82);
+}
+
+/* Originally visible tiles stay face-up; cursor shows they can't be flipped */
+.tile.permanent-face-up {
+  cursor: default;
+}
+
+.tile.matched {
+  pointer-events: none;
+  transition: opacity 0.3s;
+  opacity: 0;
+}
+
+/* ── 3-D flip inner ───────────────────────────────────────────────── */
+.tile-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.38s ease;
+  border-radius: 10px;
+}
+.tile.flipped .tile-inner { transform: rotateY(180deg); }
+
+/* ── shared face styles ───────────────────────────────────────────── */
+.tile-back, .tile-front {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* ── back face (colour applied via JS inline style) ───────────────── */
+.tile-back {
+  border: 2px solid transparent;
+  box-shadow:
+    4px 4px 0 rgba(0,0,0,0.6),
+    0  0  8px rgba(0,0,0,0.55),
+    inset 0 1px 2px rgba(255,255,255,0.18);
+}
+.tile-back::after {
+  content: '';
+  width: 48px;
+  height: 62px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: 5px;
+}
+
+/* ── front face ───────────────────────────────────────────────────── */
+.tile-front {
+  background: linear-gradient(145deg, #ffffff 0%, #f0ede5 100%);
+  border: 2px solid #c8b89a;
+  transform: rotateY(180deg);
+  box-shadow:
+    4px 4px 0 #8a7a60,
+    3px 3px 0 #b0a080,
+    0  0  8px rgba(0,0,0,0.5),
+    inset 0 -3px 6px rgba(0,0,0,0.12);
+  flex-direction: column;
+  gap: 2px;
+}
+.tile-front svg { width: 56px; height: 70px; }
+
+/* permanent-face-up tiles get a subtle gold trim so player knows they're locked */
+.tile.permanent-face-up .tile-front {
+  border-color: #d4a017;
+  box-shadow:
+    4px 4px 0 #8a7a60,
+    3px 3px 0 #b0a080,
+    0  0  6px rgba(212,160,23,0.4),
+    inset 0 -3px 6px rgba(0,0,0,0.12);
+}
+
+/* ── selected ─────────────────────────────────────────────────────── */
+.tile.selected .tile-back,
+.tile.selected .tile-front {
+  outline: 3px solid #ffeb3b;
+  outline-offset: 2px;
+}
+
+/* ── in-box tiles ─────────────────────────────────────────────────── */
+#tile-box .tile {
+  position: relative;
+  width: 62px;
+  height: 74px;
+  flex-shrink: 0;
+  perspective: 700px;
+}
+#tile-box .tile .tile-back,
+#tile-box .tile .tile-front {
+  box-shadow: 3px 3px 0 #0d2418, 0 0 6px rgba(0,0,0,0.45);
+}
+
+/* ── fly-to-box animation ─────────────────────────────────────────── */
+.fly-tile {
+  position: fixed;
+  pointer-events: none;
+  z-index: 8000;
+  width: 62px;
+  height: 74px;
+  perspective: 700px;
+}
+.fly-tile .tile-inner {
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateY(180deg);
+  border-radius: 10px;
+}
+.fly-tile .tile-back,
+.fly-tile .tile-front {
+  position: absolute; inset: 0;
+  border-radius: 10px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.fly-tile .tile-back  { border: 2px solid transparent; }
+.fly-tile .tile-front {
+  background: linear-gradient(145deg, #ffffff 0%, #f0ede5 100%);
+  border: 2px solid #c8b89a;
+  transform: rotateY(180deg);
+  flex-direction: column;
+  box-shadow: 3px 3px 0 #8a7a60;
+}
+.fly-tile .tile-front svg { width: 50px; height: 62px; }
+
+@keyframes flyToBox {
+  0%   { transform: translate(0,0) scale(1);   opacity: 1; }
+  55%  { opacity: 1; }
+  100% { transform: translate(var(--fly-dx),var(--fly-dy)) scale(0.9); opacity: 0; }
+}
+.fly-tile.flying { animation: flyToBox 0.44s cubic-bezier(0.4,0,0.2,1) forwards; }
+
+/* ── box-entry pop ────────────────────────────────────────────────── */
+@keyframes boxEntryPop {
+  0%   { transform: scale(0.55) rotateY(180deg); opacity: 0; }
+  60%  { transform: scale(1.1)  rotateY(180deg); opacity: 1; }
+  100% { transform: scale(1)    rotateY(180deg); opacity: 1; }
+}
+.tile.box-entry .tile-inner {
+  animation: boxEntryPop 0.36s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+
+/* ── pair-glow ────────────────────────────────────────────────────── */
+@keyframes matchGlow {
+  0%,100% { box-shadow: 0 0 0 3px #ffeb3b, 3px 3px 0 #8a7a60; }
+  50%      { box-shadow: 0 0 0 6px #ff9800, 3px 3px 0 #8a7a60; }
+}
+.tile.pair-glow .tile-front { animation: matchGlow 0.6s ease infinite; }
+
+/* ── match-clear animation ────────────────────────────────────────── */
+@keyframes matchFade {
+  0%   { opacity: 1;   transform: scale(1); }
+  40%  { opacity: 0.5; transform: scale(1.18); }
+  100% { opacity: 0;   transform: scale(0.4); }
+}
+.tile.clearing .tile-inner { animation: matchFade 0.45s ease forwards; }
+
+/* ── footer timer ─────────────────────────────────────────────────── */
+#game-footer {
+  background: #14432a;
+  border-radius: 12px;
+  padding: 10px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #c8e6c9;
+  font-size: 0.9rem;
+}
+#timer { font-weight: bold; color: #fff; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+#best-time-display { font-size: 0.82rem; color: #81c784; }
+
+/* ── hint ─────────────────────────────────────────────────────────── */
+#hint {
+  font-size: 0.72rem; color: #81c784;
+  text-align: center; opacity: 0.8;
+}
+
+/* ── start screen ─────────────────────────────────────────────────── */
+#start-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+#start-screen.hidden { display: none; }
+
+#start-box {
+  background: #1b5e35;
+  border: 2px solid #81c784;
+  border-radius: 16px;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+  color: #f5e6c8;
+}
+#start-box h2 { text-align: center; font-size: 1.4rem; margin-bottom: 4px; }
+#start-box label { font-size: 0.8rem; color: #81c784; text-transform: uppercase; letter-spacing: 1px; }
+#start-box input,
+#start-box select {
+  width: 100%;
+  background: #0e2f1c;
+  border: 1px solid #2e7d32;
+  border-radius: 6px;
+  color: #f5e6c8;
+  padding: 8px 10px;
+  font-size: 0.95rem;
+  outline: none;
+}
+#start-box input:focus,
+#start-box select:focus { border-color: #81c784; }
+
+#best-scores-preview {
+  background: #0e2f1c;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: #81c784;
+  min-height: 36px;
+  line-height: 1.8;
+}
+
+#start-btn {
+  background: #388e3c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.2s;
+}
+#start-btn:hover { background: #2e7d32; }
+
+/* ── game overlay (win / fail) ────────────────────────────────────── */
+#overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.68);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+}
+#overlay.hidden { display: none; }
+#overlay-box {
+  background: #1b5e35;
+  border: 2px solid #81c784;
+  border-radius: 16px;
+  padding: 36px 40px;
+  text-align: center;
+  color: #f5e6c8;
+  max-width: 340px;
+}
+#overlay-msg {
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+#overlay-btn {
+  background: #388e3c; color: #fff;
+  border: none; border-radius: 8px;
+  padding: 12px 32px; font-size: 1rem;
+  cursor: pointer; transition: background 0.2s;
+}
+#overlay-btn:hover { background: #2e7d32; }
