@@ -201,4 +201,10 @@ const TILE_TYPES = [
   { id: 'rooster', label: '雞', svg: animalSVG('🐓', '雞', '#e53935') },
   { id: 'crab',    label: '蟹', svg: animalSVG('🦀', '蟹', '#e53935') },
   { id: 'ox',      label: '牛', svg: animalSVG('🐂', '牛', '#5d4037') },
+
+  // Car brands (3) — generic vehicle icon + brand name text. These are
+  // original tile art, not reproductions of the actual trademarked logos.
+  { id: 'car_tesla',  label: 'Tesla',  svg: animalSVG('⚡', 'Tesla',  '#e82127') },
+  { id: 'car_honda',  label: 'Honda',  svg: animalSVG('🚗', 'Honda',  '#1565c0') },
+  { id: 'car_toyota', label: 'Toyota', svg: animalSVG('🚙', 'Toyota', '#c0392b') },
 ];

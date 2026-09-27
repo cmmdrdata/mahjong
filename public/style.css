@@ -164,6 +164,7 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
   /* expand horizontally to fit whatever width #board needs */
   overflow-x: auto;
   overflow-y: visible;
+  position: relative; /* positioning context for #pause-overlay */
 }
 
 #board {
@@ -172,6 +173,57 @@ header h1 { font-size: 1.2rem; letter-spacing: 1px; }
   /* ensure the parent stretches to match */
   min-width: 100%;
 }
+
+/* ── pause overlay ────────────────────────────────────────────────── */
+/* Sized in JS to exactly match #board's own width/height (not #board-area's
+   visible viewport), so it scrolls together with the board and always fully
+   covers it even when the board is wider than the visible area. */
+#pause-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(8, 26, 16, 0.93);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 500;
+}
+#pause-overlay.hidden { display: none; }
+
+#pause-box {
+  text-align: center;
+  color: #f5e6c8;
+}
+#pause-box p {
+  font-size: 1.4rem;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+#pause-resume-btn {
+  background: #388e3c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#pause-resume-btn:hover { background: #2e7d32; }
+
+/* ── pause button (header) ───────────────────────────────────────── */
+#pause-btn {
+  background: #2e7d32;
+  color: #fff;
+  border: 1.5px solid #66bb6a;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+#pause-btn:hover { background: #388e3c; }
 
 /* ── tile card ────────────────────────────────────────────────────── */
 .tile {
